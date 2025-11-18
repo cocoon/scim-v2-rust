@@ -5,10 +5,13 @@ use crate::models::scim_schema::Meta;
 use crate::utils::error::SCIMError;
 
 #[derive(Serialize, Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
 pub struct Group {
     pub schemas: Vec<String>,
-    pub id: String,
-    #[serde(rename = "displayName")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub external_id: Option<String>,
     pub display_name: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub members: Option<Vec<Member>>,
@@ -20,7 +23,8 @@ impl Default for Group {
     fn default() -> Self {
         Group {
             schemas: vec!["urn:ietf:params:scim:schemas:core:2.0:Group".to_string()],
-            id: "default_id".to_string(),
+            id: None,
+            external_id: None,
             display_name: "default_display_name".to_string(),
             members: None,
             meta: None,
@@ -28,19 +32,17 @@ impl Default for Group {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug)]
-#[derive(Default)]
+#[derive(Serialize, Deserialize, Debug, Default)]
 pub struct Member {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub value: Option<String>,
     #[serde(rename = "$ref", skip_serializing_if = "Option::is_none")]
-    pub ref_: Option<String>,
-    #[serde(rename = "type", skip_serializing_if = "Option::is_none")]
-    pub type_: Option<String>,
+    pub r#ref: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub r#type: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub display: Option<String>,
 }
-
 
 /// Converts a JSON string into a `Group` struct.
 ///
@@ -92,7 +94,7 @@ impl Group {
     ///
     /// let group = Group {
     ///     schemas: vec!["urn:ietf:params:scim:schemas:core:2.0:Group".to_string()],
-    ///     id: "e9e30dba-f08f-4109-8486-d5c6a331660a".to_string(),
+    ///     id: Some("e9e30dba-f08f-4109-8486-d5c6a331660a".to_string()),
     ///     display_name: "Tour Guides".to_string(),
     ///     // other fields...
     ///     ..Default::default()
@@ -106,9 +108,6 @@ impl Group {
     pub fn validate(&self) -> Result<(), SCIMError> {
         if self.schemas.is_empty() {
             return Err(SCIMError::MissingRequiredField("schemas".to_string()));
-        }
-        if self.id.is_empty() {
-            return Err(SCIMError::MissingRequiredField("id".to_string()));
         }
         if self.display_name.is_empty() {
             return Err(SCIMError::MissingRequiredField("display_name".to_string()));
@@ -131,7 +130,7 @@ impl Group {
     ///
     /// let group = Group {
     ///     schemas: vec!["urn:ietf:params:scim:schemas:core:2.0:Group".to_string()],
-    ///     id: "e9e30dba-f08f-4109-8486-d5c6a331660a".to_string(),
+    ///     id: Some("e9e30dba-f08f-4109-8486-d5c6a331660a".to_string()),
     ///     display_name: "Tour Guides".to_string(),
     ///     // other fields...
     ///     ..Default::default()
@@ -216,16 +215,34 @@ mod tests {
         }
         assert!(group.is_ok());
         let group = group.unwrap();
-        assert_eq!(group.schemas, vec!["urn:ietf:params:scim:schemas:core:2.0:Group"]);
-        assert_eq!(group.id, "e9e30dba-f08f-4109-8486-d5c6a331660a");
+        assert_eq!(
+            group.schemas,
+            vec!["urn:ietf:params:scim:schemas:core:2.0:Group"]
+        );
+        assert_eq!(
+            group.id,
+            Some("e9e30dba-f08f-4109-8486-d5c6a331660a".into())
+        );
         assert_eq!(group.display_name, "Tour Guides");
 
         // Check members
         assert_eq!(group.members.as_ref().unwrap().len(), 2);
-        assert_eq!(group.members.as_ref().unwrap()[0].value, Some("2819c223-7f76-453a-919d-413861904646".to_string()));
-        assert_eq!(group.members.as_ref().unwrap()[0].display, Some("Babs Jensen".to_string()));
-        assert_eq!(group.members.as_ref().unwrap()[1].value, Some("902c246b-6245-4190-8e05-00816be7344a".to_string()));
-        assert_eq!(group.members.as_ref().unwrap()[1].display, Some("Mandy Pepperidge".to_string()));
+        assert_eq!(
+            group.members.as_ref().unwrap()[0].value,
+            Some("2819c223-7f76-453a-919d-413861904646".to_string())
+        );
+        assert_eq!(
+            group.members.as_ref().unwrap()[0].display,
+            Some("Babs Jensen".to_string())
+        );
+        assert_eq!(
+            group.members.as_ref().unwrap()[1].value,
+            Some("902c246b-6245-4190-8e05-00816be7344a".to_string())
+        );
+        assert_eq!(
+            group.members.as_ref().unwrap()[1].display,
+            Some("Mandy Pepperidge".to_string())
+        );
 
         // Check meta
         let meta = group.meta.unwrap();
@@ -233,7 +250,10 @@ mod tests {
         assert_eq!(meta.created, Some("2010-01-23T04:56:22Z".to_string()));
         assert_eq!(meta.last_modified, Some("2011-05-13T04:42:34Z".to_string()));
         assert_eq!(meta.version, Some("W/\"3694e05e9dff592\"".to_string()));
-        assert_eq!(meta.location, Some("https://example.com/v2/Groups/e9e30dba-f08f-4109-8486-d5c6a331660a".to_string()));
+        assert_eq!(
+            meta.location,
+            Some("https://example.com/v2/Groups/e9e30dba-f08f-4109-8486-d5c6a331660a".to_string())
+        );
     }
 
     #[test]
@@ -258,8 +278,14 @@ mod tests {
         }
         assert!(group.is_ok());
         let group = group.unwrap();
-        assert_eq!(group.schemas, vec!["urn:ietf:params:scim:schemas:core:2.0:Group"]);
-        assert_eq!(group.id, "e9e30dba-f08f-4109-8486-d5c6a331660a");
+        assert_eq!(
+            group.schemas,
+            vec!["urn:ietf:params:scim:schemas:core:2.0:Group"]
+        );
+        assert_eq!(
+            group.id,
+            Some("e9e30dba-f08f-4109-8486-d5c6a331660a".into())
+        );
         assert_eq!(group.display_name, "Tour Guides");
     }
 
@@ -295,8 +321,14 @@ mod tests {
 
         assert!(group.is_ok());
         let group = group.unwrap();
-        assert_eq!(group.schemas, vec!["urn:ietf:params:scim:schemas:core:2.0:Group"]);
-        assert_eq!(group.id, "e9e30dba-f08f-4109-8486-d5c6a331660a");
+        assert_eq!(
+            group.schemas,
+            vec!["urn:ietf:params:scim:schemas:core:2.0:Group"]
+        );
+        assert_eq!(
+            group.id,
+            Some("e9e30dba-f08f-4109-8486-d5c6a331660a".into())
+        );
         assert_eq!(group.display_name, "Tour Guides");
         assert!(group.members.is_none());
         assert!(group.meta.is_none());
